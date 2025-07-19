@@ -1,6 +1,8 @@
 const { validationResult } = require('express-validator');
 const AppError = require('../utils/AppError');
 const User = require('../models/user');
+const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
 function expressErrorHandler(req) {
   const errors = validationResult(req);
@@ -94,7 +96,10 @@ exports.login = async (req, res, next) => {
     }
 
     const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+    const refreshToken = await user.generateRefreshToken();
+
+    user.lastLogin = Date.now();
+    await user.save();
 
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
@@ -112,5 +117,91 @@ exports.login = async (req, res, next) => {
   } catch (error) {
     console.error(error);
     return next(new AppError('Something went wrong in login', 500));
+  }
+};
+
+exports.getUser = async (req, res, next) => {
+  expressErrorHandler(req);
+
+  try {
+    console.log({ 'User data': req.user });
+    if (!req.user) {
+      return next(new AppError('Please login first', 401));
+    }
+
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return next(new AppError('User not found', 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'User successfully fetched',
+      user,
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
+    return next(new AppError('Failed to fetch user', 500));
+  }
+};
+
+exports.refreshToken = async (req, res, next) => {
+  try {
+    const token = req.cookies.refreshToken;
+
+    if (!token) {
+      return res.status(401).json({ message: 'No refresh token provided' });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_REFRESHTOKEN_SECRET);
+
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const newAccessToken = user.generateAccessToken();
+    const newRefreshToken = await user.generateRefreshToken();
+
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'Strict',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({ accessToken: newAccessToken });
+  } catch (err) {
+    console.error(err);
+    return res.status(401).json({ message: 'Invalid or expired refresh token' });
+  }
+};
+
+exports.logout = async (req, res, next) => {
+  try {
+    const token = req.cookies.refreshToken;
+
+    if (!token) {
+      return res.status(400).json({ message: 'No refresh token found in cookies' });
+    }
+
+    const user = await User.findOne({ refreshToken: token }).select('+refreshToken');
+
+    if (user) {
+      user.refreshToken = null;
+      await user.save();
+    }
+
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+
+    return res.status(200).json({ message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
   }
 };

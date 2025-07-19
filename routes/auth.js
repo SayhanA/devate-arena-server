@@ -1,6 +1,7 @@
 const express = require('express');
-const { register, login, verify } = require('../controllers/auth');
+const { register, login, verify, getUser, refreshToken, logout } = require('../controllers/auth');
 const { body } = require('express-validator');
+const { authenticate } = require('../middlewares/authMiddleware');
 const router = express.Router();
 
 router.post(
@@ -24,5 +25,11 @@ router.post(
   body('password', 'Password is required!').trim(),
   login
 );
+
+router.get('/user', authenticate, getUser);
+
+router.get('/refresh-accesstoken', refreshToken);
+
+router.get('/logout', logout);
 
 module.exports = router;
