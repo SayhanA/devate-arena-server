@@ -1,0 +1,15 @@
+# dotenv environment variables file
+.env
+.env.test
+.env*.local
+
+# VSCode settings
+.vscode/*
+
+# Dependency directories
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
