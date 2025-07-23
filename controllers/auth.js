@@ -52,7 +52,6 @@ exports.verify = async (req, res, next) => {
 
   try {
     const { token, email } = req.body;
-    console.log({ token, email });
 
     const user = await User.findOne({
       email,
@@ -85,7 +84,7 @@ exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email, isVerified: true });
     if (!user) {
       return next(new AppError('Invalid email or password', 401));
     }
@@ -124,7 +123,6 @@ exports.getUser = async (req, res, next) => {
   expressErrorHandler(req);
 
   try {
-    console.log({ 'User data': req.user });
     if (!req.user) {
       return next(new AppError('Please login first', 401));
     }

@@ -18,7 +18,7 @@ exports.authenticate = async (req, res, next) => {
       return next(new AppError('Invalid token payload', 401));
     }
 
-    const user = await User.findById(decoded.id);
+    const user = await User.findOne({ _id: decoded.id, isVerified: true });
 
     if (!user) {
       return next(new AppError('User not found', 404));
